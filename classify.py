@@ -7,8 +7,9 @@ import datetime
 stemmer = LancasterStemmer()
 import numpy as np
 import time
-import parsejson
+from s3_parser import EmailParser
 
+parser = EmailParser()
 # 3 classes of training data
 training_data = []
 # training_data.append({"class":"automated", "sentence":"Out of office"})
@@ -21,7 +22,7 @@ training_data = []
 # training_data.append({"class":"nonautomated", "sentence":"yeah, totally"})
 # training_data.append({"class":"nonautomated", "sentence":"lets talk soon"})
 #print ("%s sentences in training data" % len(training_data))
-training_data = parsejson.fetch_data('data.json')[:500]
+training_data = parser.fetch_data('data.json')
 
 words = []
 classes = []
@@ -89,7 +90,7 @@ def sigmoid(x):
 def sigmoid_output_to_derivative(output):
     return output*(1-output)
 
- 
+
 def clean_up_sentence(sentence):
     # tokenize the pattern
     sentence_words = nltk.word_tokenize(sentence)
@@ -102,10 +103,10 @@ def bow(sentence, words, show_details=False):
     # tokenize the pattern
     sentence_words = clean_up_sentence(sentence)
     # bag of words
-    bag = [0]*len(words)  
+    bag = [0]*len(words)
     for s in sentence_words:
         for i,w in enumerate(words):
-            if w == s: 
+            if w == s:
                 bag[i] = 1
                 if show_details:
                     print ("found in bag: %s" % w)
@@ -141,13 +142,13 @@ def train(X, y, hidden_neurons=10, alpha=1, epochs=50000, dropout=False, dropout
 
     synapse_0_direction_count = np.zeros_like(synapse_0)
     synapse_1_direction_count = np.zeros_like(synapse_1)
-        
+
     for j in iter(range(epochs+1)):
 
         # Feed forward through layers 0, 1, and 2
         layer_0 = X
         layer_1 = sigmoid(np.dot(layer_0, synapse_0))
-                
+
         if(dropout):
             layer_1 *= np.random.binomial([np.ones((len(X),hidden_neurons))],1-dropout_percent)[0] * (1.0/(1-dropout_percent))
 
@@ -164,7 +165,7 @@ def train(X, y, hidden_neurons=10, alpha=1, epochs=50000, dropout=False, dropout
             else:
                 print ("break:", np.mean(np.abs(layer_2_error)), ">", last_mean_error )
                 break
-                
+
         # in what direction is the target value?
         # were we really sure? if so, don't change too much.
         layer_2_delta = layer_2_error * sigmoid_output_to_derivative(layer_2)
@@ -175,17 +176,17 @@ def train(X, y, hidden_neurons=10, alpha=1, epochs=50000, dropout=False, dropout
         # in what direction is the target l1?
         # were we really sure? if so, don't change too much.
         layer_1_delta = layer_1_error * sigmoid_output_to_derivative(layer_1)
-        
+
         synapse_1_weight_update = (layer_1.T.dot(layer_2_delta))
         synapse_0_weight_update = (layer_0.T.dot(layer_1_delta))
-        
+
         if(j > 0):
             synapse_0_direction_count += np.abs(((synapse_0_weight_update > 0)+0) - ((prev_synapse_0_weight_update > 0) + 0))
-            synapse_1_direction_count += np.abs(((synapse_1_weight_update > 0)+0) - ((prev_synapse_1_weight_update > 0) + 0))        
-        
+            synapse_1_direction_count += np.abs(((synapse_1_weight_update > 0)+0) - ((prev_synapse_1_weight_update > 0) + 0))
+
         synapse_1 += alpha * synapse_1_weight_update
         synapse_0 += alpha * synapse_0_weight_update
-        
+
         prev_synapse_0_weight_update = synapse_0_weight_update
         prev_synapse_1_weight_update = synapse_1_weight_update
 
@@ -218,17 +219,17 @@ print ("processing time:", elapsed_time, "seconds")
 # probability threshold
 ERROR_THRESHOLD = 0.2
 # load our calculated synapse values
-synapse_file = 'synapses.json' 
-with open(synapse_file) as data_file: 
-    synapse = json.load(data_file) 
-    synapse_0 = np.asarray(synapse['synapse0']) 
+synapse_file = 'synapses.json'
+with open(synapse_file) as data_file:
+    synapse = json.load(data_file)
+    synapse_0 = np.asarray(synapse['synapse0'])
     synapse_1 = np.asarray(synapse['synapse1'])
 
 def classify(sentence, show_details=False):
     results = think(sentence, show_details)
 
-    results = [[i,r] for i,r in enumerate(results) if r>ERROR_THRESHOLD ] 
-    results.sort(key=lambda x: x[1], reverse=True) 
+    results = [[i,r] for i,r in enumerate(results) if r>ERROR_THRESHOLD ]
+    results.sort(key=lambda x: x[1], reverse=True)
     return_results =[[classes[r[0]],r[1]] for r in results]
     print ("%s \n classification: %s" % (sentence, return_results))
     return return_results
