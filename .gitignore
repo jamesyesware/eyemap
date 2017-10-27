@@ -3,4 +3,5 @@ emails.json
 synapses.json
 /__pycache__
 /env
+/data
 *.pyc
