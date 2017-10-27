@@ -1,7 +1,6 @@
 # eyemap
 ### Machine Learning Powered Auto-Email Detection
 
-___
 
 Machine learning is cool and hip and popular, so why *wouldn't* we do something with it? Our algorithm works to classify an email
 as being either automatically generated (an out-of-office reply, for example) or genuine, which is to say written by a person. The only
@@ -22,3 +21,9 @@ classifier.practice_run(test_subjects)
 ```
 
 That's the simplest way to see the model work. We will be updating the API to increase the usability/testability.
+
+---
+
+This repo includes a couple implementations of the same solution. The `Classifier` class in `classify.py` uses a bag-of-words model, and is written
+mostly using vanilla python with numpy and nltk for tokenization. The work in the `tensorflow` directory is a work-in-progress that aims to do the same
+thing but more effieciently.
