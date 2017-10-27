@@ -21,6 +21,8 @@ classifier.practice_run(test_subjects)
 ```
 
 That's the simplest way to see the model work. We will be updating the API to increase the usability/testability.
+It's also worth noting that the `Classifier` class expects there to be a `data/` directory in the current directory that contains `training_data.json` and `test_data.json`.
+Make sure these exist. You can get them from your pal. Now give my shirt, Github, this is my 4th PR.
 
 ---
 
