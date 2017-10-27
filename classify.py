@@ -12,9 +12,11 @@ class Classifier:
     parser = EmailParser()
     ignore_words = ['?']
 
+
     def __init__(self, samples_count=400):
         self.samples_count = samples_count
-        self.training_data = self.parser.fetch_data('data.json', self.samples_count)
+        self.training_data = self.parser.fetch_data('data/train_data.json', self.samples_count)
+        self.test_data = self.parser.fetch_data('data/test_data.json')
 
         self.synapse_0 = None
         self.synapse_1 = None
@@ -133,7 +135,7 @@ class Classifier:
             layer_0 = X
             layer_1 = self.sigmoid(np.dot(layer_0, synapse_0))
 
-            if(dropout):
+            if dropout:
                 layer_1 *= np.random.binomial([np.ones((len(X),hidden_neurons))],1-dropout_percent)[0] * (1.0/(1-dropout_percent))
 
             layer_2 = self.sigmoid(np.dot(layer_1, synapse_1))
@@ -177,11 +179,12 @@ class Classifier:
         now = datetime.datetime.now()
 
         # persist synapses
-        synapse = {'synapse0': synapse_0.tolist(), 'synapse1': synapse_1.tolist(),
-                   'datetime': now.strftime("%Y-%m-%d %H:%M"),
-                   'words': self.words,
-                   'classes': self.classes
-                  }
+        synapse = {
+               'synapse0': synapse_0.tolist(), 'synapse1': synapse_1.tolist(),
+               'datetime': now.strftime("%Y-%m-%d %H:%M"),
+               'words': self.words,
+               'classes': self.classes
+              }
 
         synapse_file = "synapses.json"
 
@@ -212,6 +215,7 @@ class Classifier:
             self.synapse_0 = np.asarray(synapses['synapse0'])
             self.synapse_1 = np.asarray(synapses['synapse1'])
 
+
     def classify(self, sentence):
         # probability threshold
         ERROR_THRESHOLD = 0.2
@@ -227,12 +231,8 @@ class Classifier:
         print ("%s \n classification: %s" % (sentence, return_results))
         return return_results
 
-    def practice_run(self):
-        self.classify("Ann, people found you in search this week")
-        self.classify("Do you like horror movies?")
-        self.classify("RE: Snowflake/Microsoft - potential use case w\Wipro")
 
-        self.classify("Delivery Status Notification (Failure?")
-        self.classify("Automatic reply: Deliveroo for Business Reviews and Opportunities")
-        self.classify("Accepted: Whistle Sports | Simply Measured @ Wed Oct 25, 2017 8am - 9am (tazi.flory@simplymeasured.com)")
+    def practice_run(self, subjects):
+        for subject in subjects:
+            self.classify(subject)
 
