@@ -4,33 +4,23 @@ from nltk.stem.lancaster import LancasterStemmer
 import os
 import json
 import datetime
-stemmer = LancasterStemmer()
 import numpy as np
 import time
 from s3_parser import EmailParser
 
+stemmer = LancasterStemmer()
 parser = EmailParser()
-# 3 classes of training data
-training_data = []
-# training_data.append({"class":"automated", "sentence":"Out of office"})
-# training_data.append({"class":"automated", "sentence":"Sorry I missed you"})
-# training_data.append({"class":"automated", "sentence":"Oops I'm not here"})
-# training_data.append({"class":"automated", "sentence":"I'll be back Monday!"})
 
-# training_data.append({"class":"nonautomated", "sentence":"hi friend"})
-# training_data.append({"class":"nonautomated", "sentence":"good to hear from you!"})
-# training_data.append({"class":"nonautomated", "sentence":"yeah, totally"})
-# training_data.append({"class":"nonautomated", "sentence":"lets talk soon"})
-#print ("%s sentences in training data" % len(training_data))
-training_data = parser.fetch_data('data.json')
+# For automated and nonautomated emails, get N instances of each
+training_data = parser.fetch_data('data.json', 400)
 
 words = []
 classes = []
 documents = []
 ignore_words = ['?']
+
 # loop through each sentence in our training data
 for pattern in training_data:
-    print(pattern['subject'])
     # tokenize each word in the sentence
     w = nltk.word_tokenize(pattern['subject'])
     # add to our words list
@@ -44,17 +34,14 @@ for pattern in training_data:
 # stem and lower each word and remove duplicates
 words = [stemmer.stem(w.lower()) for w in words if w not in ignore_words]
 words = list(set(words))
+
 # remove duplicates
 classes = list(set(classes))
 
-#print (len(documents), "documents", documents)
-#print (len(classes), "classes", classes)
-#print (len(words), "unique stemmed words", words)
-
 #create training data
-
 training = []
 output = []
+
 # create an empty array for our output
 output_empty = [0] * len(classes)
 
@@ -74,18 +61,13 @@ for doc in documents:
     # output is a '0' for each tag and '1' for current tag
     output_row = list(output_empty)
     output_row[classes.index(doc[1])] = 1
-    #print classes.index(doc[1])
     output.append(output_row)
-
-# sample training/output
-i = 0
-w = documents[i][0]
-
 
 # compute sigmoid nonlinearity
 def sigmoid(x):
     output = 1/(1+np.exp(-x))
     return output
+
 # convert output of sigmoid function to its derivative
 def sigmoid_output_to_derivative(output):
     return output*(1-output)
@@ -99,7 +81,7 @@ def clean_up_sentence(sentence):
     return sentence_words
 
 # return bag of words array: 0 or 1 for each word in the bag that exists in the sentence
-def bow(sentence, words, show_details=False):
+def bow(sentence, words):
     # tokenize the pattern
     sentence_words = clean_up_sentence(sentence)
     # bag of words
@@ -108,15 +90,12 @@ def bow(sentence, words, show_details=False):
         for i,w in enumerate(words):
             if w == s:
                 bag[i] = 1
-                if show_details:
-                    print ("found in bag: %s" % w)
 
     return(np.array(bag))
 
-def think(sentence, show_details=False):
-    x = bow(sentence.lower(), words, show_details)
-    if show_details:
-        print ("sentence:", sentence, "\n bow:", x)
+
+def think(sentence):
+    x = bow(sentence.lower(), words)
     # input layer is our bag of words
     l0 = x
     # matrix multiplication of input and hidden layer
@@ -127,7 +106,6 @@ def think(sentence, show_details=False):
 
 
 def train(X, y, hidden_neurons=10, alpha=1, epochs=50000, dropout=False, dropout_percent=0.5):
-
     print ("Training with %s neurons, alpha:%s, dropout:%s %s" % (hidden_neurons, str(alpha), dropout, dropout_percent if dropout else '') )
     print ("Input matrix: %sx%s    Output matrix: %sx%s" % (len(X),len(X[0]),1, len(classes)) )
     np.random.seed(1)
@@ -215,7 +193,6 @@ train(X, y, hidden_neurons=20, alpha=0.1, epochs=100000, dropout=False, dropout_
 elapsed_time = time.time() - start_time
 print ("processing time:", elapsed_time, "seconds")
 
-
 # probability threshold
 ERROR_THRESHOLD = 0.2
 # load our calculated synapse values
@@ -225,8 +202,8 @@ with open(synapse_file) as data_file:
     synapse_0 = np.asarray(synapse['synapse0'])
     synapse_1 = np.asarray(synapse['synapse1'])
 
-def classify(sentence, show_details=False):
-    results = think(sentence, show_details)
+def classify(sentence):
+    results = think(sentence)
 
     results = [[i,r] for i,r in enumerate(results) if r>ERROR_THRESHOLD ]
     results.sort(key=lambda x: x[1], reverse=True)
@@ -234,16 +211,11 @@ def classify(sentence, show_details=False):
     print ("%s \n classification: %s" % (sentence, return_results))
     return return_results
 
-classify("OOO be back soon")
-classify("Not here")
-classify("Be back on Tuesday")
-classify("who are you?")
-classify("hey friend")
-classify("how was your lunch today?")
-print()
-classify("Out of office", show_details=True)
+classify("Ann, people found you in search this week")
+classify("Do you like horror movies?")
+classify("RE: Snowflake/Microsoft - potential use case w\Wipro")
 
-
-
-
+classify("Delivery Status Notification (Failure?")
+classify("Automatic reply: Deliveroo for Business Reviews and Opportunities")
+classify("Accepted: Whistle Sports | Simply Measured @ Wed Oct 25, 2017 8am - 9am (tazi.flory@simplymeasured.com)")
 
