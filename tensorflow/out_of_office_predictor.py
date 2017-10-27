@@ -14,6 +14,8 @@ import tensorflow as tf
 
 import file_parser
 
+import pdb
+
 FLAGS = None
 
 MAX_DOCUMENT_LENGTH = 60
@@ -93,59 +95,89 @@ def rnn_model(features, labels, mode):
   return estimator_spec_for_softmax_classification(
       logits=logits, labels=labels, mode=mode)
 
+def user_input(classifier):
+  print()
+  while True:
+    user_in = raw_input("Enter a subject line or q to exit\n")
+
+    if user_in.lower() == "q":
+      break
+    else:
+      vocab_processor = tf.contrib.learn.preprocessing.VocabularyProcessor(
+        MAX_DOCUMENT_LENGTH)
+
+      x_transform_test = vocab_processor.transform([user_in])
+      x_test = np.array(list(x_transform_test))
+
+      test_input_fn = tf.estimator.inputs.numpy_input_fn(
+        x={WORDS_FEATURE: x_test},
+        y=None,
+        num_epochs=1,
+        shuffle=False)
+
+      predictions = classifier.predict(input_fn=test_input_fn)
+      y_predicted = np.array(list(p['class'] for p in predictions))
+
+      print(True if y_predicted[0] == 1 else False)
+
+
 def main(args):
-    global n_words
-    tf.logging.set_verbosity(tf.logging.INFO)
+  global n_words
+  tf.logging.set_verbosity(tf.logging.INFO)
 
-    raw_data = file_parser.fetch_data(args[1])
+  raw_data = file_parser.fetch_data(args[1], 7000)
+  print("Total data: %d\n" % len(raw_data["subject"]))
 
-    # reserve 80% of data for training and 20% for testing
-    data_size = len(raw_data["subject"])
-    train_size = int(math.floor(data_size * .8))
-    test_size = data_size - train_size
+  # reserve 80% of data for training and 20% for testing
+  data_size = len(raw_data["subject"])
+  train_size = int(math.floor(data_size * 1))
+  test_size = data_size - train_size
 
-    # prepare data
-    x_train = pd.Series(raw_data["subject"][:10000])
-    y_train = pd.Series(raw_data["auto_reply"][:10000])
-    x_test = pd.Series(raw_data["subject"][-500:])
-    y_test = pd.Series(raw_data["auto_reply"][-500:])
+  # prepare data
+  x_train = pd.Series(raw_data["subject"][:train_size])
+  y_train = pd.Series(raw_data["auto_reply"][:train_size])
+  x_test = pd.Series(raw_data["subject"][-test_size:])
+  y_test = pd.Series(raw_data["auto_reply"][-test_size:])
 
-    # Process vocabulary
-    vocab_processor = tf.contrib.learn.preprocessing.VocabularyProcessor(
-      MAX_DOCUMENT_LENGTH)
+  # Process vocabulary
+  vocab_processor = tf.contrib.learn.preprocessing.VocabularyProcessor(
+    MAX_DOCUMENT_LENGTH)
 
-    x_transform_train = vocab_processor.fit_transform(x_train)
-    x_transform_test = vocab_processor.transform(x_test)
+  x_transform_train = vocab_processor.fit_transform(x_train)
+  x_transform_test = vocab_processor.transform(x_test)
 
-    x_train = np.array(list(x_transform_train))
-    x_test = np.array(list(x_transform_test))
+  x_train = np.array(list(x_transform_train))
+  x_test = np.array(list(x_transform_test))
 
-    n_words = len(vocab_processor.vocabulary_)
-    print('Total words: %d' % n_words)
+  n_words = len(vocab_processor.vocabulary_)
+  print('Total words: %d' % n_words)
 
-    # Build model
-    # Switch between rnn_model and bag_of_words_model to test different models.
-    model_fn = rnn_model
-    if FLAGS.bow_model:
-    # Subtract 1 because VocabularyProcessor outputs a word-id matrix where word
-    # ids start from 1 and 0 means 'no word'. But
-    # categorical_column_with_identity assumes 0-based count and uses -1 for
-    # missing word.
-        x_train -= 1
-        x_test -= 1
-        model_fn = bag_of_words_model
-    
-    classifier = tf.estimator.Estimator(model_fn=model_fn)
+  # Build model
+  # Switch between rnn_model and bag_of_words_model to test different models.
+  model_fn = rnn_model
+  if FLAGS.bow_model:
+  # Subtract 1 because VocabularyProcessor outputs a word-id matrix where word
+  # ids start from 1 and 0 means 'no word'. But
+  # categorical_column_with_identity assumes 0-based count and uses -1 for
+  # missing word.
+    x_train -= 1
+    x_test -= 1
+    model_fn = bag_of_words_model
 
-    # Train.
-    train_input_fn = tf.estimator.inputs.numpy_input_fn(
-      x={WORDS_FEATURE: x_train},
-      y=y_train,
-      batch_size=len(x_train),
-      num_epochs=None,
-      shuffle=True)
-    classifier.train(input_fn=train_input_fn, steps=100)
+  classifier = tf.estimator.Estimator(model_fn=model_fn)
 
+  # Train.
+  train_input_fn = tf.estimator.inputs.numpy_input_fn(
+    x={WORDS_FEATURE: x_train},
+    y=y_train,
+    batch_size=len(x_train),
+    num_epochs=None,
+    shuffle=True)
+  classifier.train(input_fn=train_input_fn, steps=100)
+
+  if FLAGS.manual_test:
+    user_input(classifier)
+  else:
     # Predict.
     test_input_fn = tf.estimator.inputs.numpy_input_fn(
       x={WORDS_FEATURE: x_test},
@@ -168,15 +200,15 @@ if __name__ == "__main__":
   parser = argparse.ArgumentParser()
   parser.register("type", "bool", lambda v: v.lower() == "true")
   parser.add_argument(
-      '--test_with_fake_data',
-      default=False,
-      help='Test the example code with fake data.',
-      action='store_true')
+    '--bow_model',
+    default=False,
+    help='Run with BOW model instead of RNN.',
+    action='store_true')
   parser.add_argument(
-      '--bow_model',
-      default=False,
-      help='Run with BOW model instead of RNN.',
-      action='store_true')
+    '--manual_test',
+    default=False,
+    help='Requests manual test data after running training',
+    action='store_true')
 
   FLAGS, unparsed = parser.parse_known_args()
   tf.app.run(main=main, argv=[sys.argv[0]] + unparsed)
