@@ -13,6 +13,7 @@ seeing 99.99% accuracy on arbitrary test input. Wow! What a time to be alive.
 from classify import Classifier
 
 classifier = Classifier()
+classifier.prepare_bag_of_words()
 classifier.start_training(50000) # no. of epochs
 
 test_subjects = [<list of real subjects that you did not train on!>]
